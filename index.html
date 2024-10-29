@@ -5,58 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>框选裁剪并缩小图片</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.css" />
-  <style>
-    /* 样式与您的代码一致 */
-    body {
-      font-family: Arial, sans-serif;
-      display: flex;
-      flex-direction: column;
-      min-height: 100vh;
-      margin: 0;
-      background-color: #f9f9f9;
-      padding: 24px;
-    }
-    .title-cell {
-      margin: 12px 0 12px 0;
-    }
-    .title {
-      color: #333;
-      font-size: 16px;
-      font-weight: bold;
-    }
-    #fileInput {
-      display: none;
-    }
-    .upload-btn {
-      display: inline-block;
-      padding: 4px 14px;
-      font-size: 14px;
-      font-weight: bold;
-      color: white;
-      background-color: #4CAF50;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-    }
-    #resizedImage {
-      width: 50%;
-    }
-    #resizedImage, #originalImage {
-      border: 1px solid #ddd;
-      border-radius: 5px;
-      max-width: 100%;
-    }
-    .size-info {
-      font-size: 14px;
-      color: #666;
-    }
-    #widthInput {
-      width: 60px;
-      padding: 5px;
-      border: 1px solid #ccc;
-      border-radius: 3px;
-    }
-  </style>
+  <link rel="stylesheet" href="./css/index.css">
 </head>
 <body>
   <div class="title-cell">
@@ -76,7 +25,10 @@
       <span class="title">原始图片:</span>
       <span id="originalSize" class="size-info"></span>
     </div>
-    <img id="originalImage" alt="原始图片" />
+    <div class="originalImage-box">
+      <img id="originalImage" alt="原始图片" />
+    </div>
+    <div id="preview" class="card"></div>
   </div>
   
   <div>
@@ -87,11 +39,11 @@
     <img id="resizedImage" alt="缩小后的图片" />
   </div>
 
-  <!-- 引入 Cropper.js 库 -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.js"></script>
   <script>
-    let img = new Image(); // 图片实例
-    let cropper; // Cropper 实例
+    let img = new Image(); 
+    let cropper; 
+    let isUpdating = false; // 标志位控制更新频率
 
     document.getElementById('fileInput').addEventListener('change', function(event) {
       const file = event.target.files[0];
@@ -102,18 +54,24 @@
           img.src = e.target.result;
           document.getElementById('originalImage').src = img.src;
           
-          // 在图片加载完成后初始化 Cropper
           img.onload = function() {
-            // 显示原始图片尺寸
             document.getElementById('originalSize').textContent = `${img.width} x ${img.height}`;
             
-            // 如果 Cropper 实例已存在，则先销毁它
             if (cropper) cropper.destroy();
             
-            // 初始化 Cropper 实例
             cropper = new Cropper(document.getElementById('originalImage'), {
-              aspectRatio: NaN, // 自由比例
-              viewMode: 1,
+              aspectRatio: NaN, 
+              viewMode: 1, 
+              dragMode: 'move',
+              crop() {
+                if (!isUpdating) {
+                  isUpdating = true;
+                  requestAnimationFrame(() => {
+                    updatePreview();
+                    isUpdating = false;
+                  });
+                }
+              }
             });
           };
         };
@@ -123,8 +81,20 @@
 
     document.getElementById('resizeButton').addEventListener('click', function() {
       const width = parseInt(document.getElementById('widthInput').value);
-      resizeImage(width); // 使用输入框中的宽度进行缩小
+      resizeImage(width);
     });
+
+    function updatePreview() {
+      if (!cropper) return;
+
+      const previewContainer = document.getElementById('preview');
+      const croppedCanvas = cropper.getCroppedCanvas({
+        width: previewContainer.clientWidth,
+        height: previewContainer.clientHeight
+      });
+      
+      previewContainer.style.backgroundImage = `url(${croppedCanvas.toDataURL()})`;
+    }
 
     function resizeImage(width) {
       if (!cropper) {
@@ -132,20 +102,15 @@
         return;
       }
 
-      // 获取裁剪后的 Canvas
       const croppedCanvas = cropper.getCroppedCanvas();
-
-      // 计算新的高度保持宽高比
       const height = (croppedCanvas.height / croppedCanvas.width) * width;
       
-      // 创建新的 Canvas 以缩小图片
       const canvas = document.createElement('canvas');
       canvas.width = width;
       canvas.height = height;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(croppedCanvas, 0, 0, width, height);
 
-      // 设置缩小后的图片源并显示其尺寸
       document.getElementById('resizedImage').src = canvas.toDataURL();
       document.getElementById('resizedSize').textContent = `${width} x ${height.toFixed(0)}`;
     }

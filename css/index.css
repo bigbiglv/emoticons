@@ -1,0 +1,61 @@
+body {
+  font-family: Arial, sans-serif;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  margin: 0;
+  background-color: #f9f9f9;
+  padding: 24px;
+}
+.title-cell {
+  margin: 12px 0 12px 0;
+}
+.title {
+  color: #333;
+  font-size: 16px;
+  font-weight: bold;
+}
+#fileInput {
+  display: none;
+}
+.upload-btn {
+  display: inline-block;
+  padding: 4px 14px;
+  font-size: 14px;
+  font-weight: bold;
+  color: white;
+  background-color: #4CAF50;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+#resizedImage {
+  width: 50%;
+}
+#resizedImage, #originalImage {
+  width: 40%;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+}
+.size-info {
+  font-size: 14px;
+  color: #666;
+}
+#widthInput {
+  width: 60px;
+  padding: 5px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+}
+
+.originalImage-box {
+  width: 300px;
+  height: 300px;
+}
+
+#preview{
+  margin-top: 20px;
+  background-repeat: no-repeat;
+  width: 300px;
+  height: 300px;
+}
