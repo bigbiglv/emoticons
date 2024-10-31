@@ -9,34 +9,42 @@
 </head>
 <body>
   <div class="title-cell">
-    <span class="title">选择一张图片:</span>
-    <label class="upload-btn" for="fileInput">选择图片</label>
-  </div>
-  <input type="file" id="fileInput" accept="image/*">
+    <label class="btn" for="fileInput">选择图片</label>
+    <button class="btn" onclick="handleCut(event)">开启裁剪模式</button>
+    <button id="resizeButton" class="btn" onclick="resizeImage()">开始转换</button>
 
-  <div class="title-cell">
-    <span class="title">设置宽度:</span>
-    <button id="resizeButton" class="upload-btn">开始转换</button>
   </div>
-  <input type="number" id="widthInput" value="64" min="1">
+  <input type="file" id="fileInput" accept="image/*" onchange="handleFileChange(event)">
 
-  <div>
+  <div class="form">
+    <div class="title-cell">
+      <span class="title">设置宽度:</span>
+      <input type="number" id="widthInput" value="80" min="1" class="input">
+    </div>
+    
+    <div class="title-cell">
+      <span class="title">设置圆角:</span>
+      <input type="number" id="imgRadius" value="5" min="0" class="input">
+    </div>
+  </div>
+
+  <div id="original" style="display: none;">
     <div class="title-cell">
       <span class="title">原始图片:</span>
       <span id="originalSize" class="size-info"></span>
     </div>
-    <div class="originalImage-box">
+    <div class="originalImage-box image">
       <img id="originalImage" alt="原始图片" />
     </div>
     <div id="preview" class="card"></div>
   </div>
   
-  <div>
+  <div id="resized" style="display: none;">
     <div class="title-cell">
       <span class="title">转换后:</span>
       <span id="resizedSize" class="size-info"></span>
     </div>
-    <img id="resizedImage" alt="缩小后的图片" />
+    <img id="resizedImage" alt="缩小后的图片" class="image" />
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.js"></script>
@@ -44,10 +52,26 @@
     let img = new Image(); 
     let cropper; 
     let isUpdating = false; // 标志位控制更新频率
+    let isCut = false; // 是否裁剪
 
-    document.getElementById('fileInput').addEventListener('change', function(event) {
+    // 是否裁剪
+    function handleCut(e) {
+      const btn = e.target
+      isCut = !isCut;
+      btn.textContent = isCut ? '关闭裁剪模式' : '开启裁剪模式';
+      document.getElementById('preview').style.display = isCut ? 'block' : 'none'
+      if(isCut) {
+        initCropper()
+      }else{
+        if (cropper) cropper.destroy();
+      }
+    }
+
+    // 文件选中后
+    function handleFileChange(event) {
       const file = event.target.files[0];
       if (file) {
+        document.getElementById('original').style.display = 'block'
         const reader = new FileReader();
         
         reader.onload = function(e) {
@@ -56,34 +80,34 @@
           
           img.onload = function() {
             document.getElementById('originalSize').textContent = `${img.width} x ${img.height}`;
+            if(isCut) initCropper()
             
-            if (cropper) cropper.destroy();
-            
-            cropper = new Cropper(document.getElementById('originalImage'), {
-              aspectRatio: NaN, 
-              viewMode: 1, 
-              dragMode: 'move',
-              crop() {
-                if (!isUpdating) {
-                  isUpdating = true;
-                  requestAnimationFrame(() => {
-                    updatePreview();
-                    isUpdating = false;
-                  });
-                }
-              }
-            });
           };
         };
         reader.readAsDataURL(file);
       }
-    });
+    }
 
-    document.getElementById('resizeButton').addEventListener('click', function() {
-      const width = parseInt(document.getElementById('widthInput').value);
-      resizeImage(width);
-    });
+    // 初始化裁剪工具
+    function initCropper() {
+      if (cropper) cropper.destroy();
+      cropper = new Cropper(document.getElementById('originalImage'), {
+        aspectRatio: NaN, 
+        viewMode: 1, 
+        dragMode: 'move',
+        crop() {
+          if (!isUpdating) {
+            isUpdating = true;
+            requestAnimationFrame(() => {
+              updatePreview();
+              isUpdating = false;
+            });
+          }
+        }
+      });
+    }
 
+    // 更新预览图
     function updatePreview() {
       if (!cropper) return;
 
@@ -96,23 +120,62 @@
       previewContainer.style.backgroundImage = `url(${croppedCanvas.toDataURL()})`;
     }
 
-    function resizeImage(width) {
-      if (!cropper) {
-        alert("请先选择并裁剪图片！");
-        return;
+    function resizeImage() {
+      const width = parseInt(document.getElementById('widthInput').value);
+
+      let canvas;
+      let height;
+
+      if (!isCut) {
+        // 直接使用原始图片的宽高来计算高度
+        height = (img.height / img.width) * width;
+        canvas = createResizedCanvas(img, width, height);
+      } else {
+        if (!cropper) {
+          alert("请先选择并裁剪图片！");
+          return;
+        }
+
+        // 使用 Cropper 进行裁剪
+        const croppedCanvas = cropper.getCroppedCanvas();
+        height = (croppedCanvas.height / croppedCanvas.width) * width;
+        canvas = createResizedCanvas(croppedCanvas, width, height);
       }
 
-      const croppedCanvas = cropper.getCroppedCanvas();
-      const height = (croppedCanvas.height / croppedCanvas.width) * width;
-      
+      document.getElementById('resizedImage').src = canvas.toDataURL();
+      document.getElementById('resizedSize').textContent = `${width} x ${height.toFixed(0)}`;
+      document.getElementById('resized').style.display = 'block'
+
+    }
+
+    // 创建缩放后的画布
+    function createResizedCanvas(sourceCanvas, width, height) {
       const canvas = document.createElement('canvas');
       canvas.width = width;
       canvas.height = height;
       const ctx = canvas.getContext('2d');
-      ctx.drawImage(croppedCanvas, 0, 0, width, height);
 
-      document.getElementById('resizedImage').src = canvas.toDataURL();
-      document.getElementById('resizedSize').textContent = `${width} x ${height.toFixed(0)}`;
+      // 设置圆角半径
+      const imgRadius = parseInt(document.getElementById('imgRadius').value); // 根据需要调整圆角半径
+
+      // 绘制圆角矩形
+      ctx.beginPath();
+      ctx.moveTo(imgRadius, 0);
+      ctx.lineTo(width - imgRadius, 0);
+      ctx.arcTo(width, 0, width, imgRadius, imgRadius);
+      ctx.lineTo(width, height - imgRadius);
+      ctx.arcTo(width, height, width - imgRadius, height, imgRadius);
+      ctx.lineTo(imgRadius, height);
+      ctx.arcTo(0, height, 0, height - imgRadius, imgRadius);
+      ctx.lineTo(0, imgRadius);
+      ctx.arcTo(0, 0, imgRadius, 0, imgRadius);
+      ctx.closePath();
+      ctx.clip(); // 应用圆角剪切
+
+      // 绘制图像
+      ctx.drawImage(sourceCanvas, 0, 0, width, height);
+      
+      return canvas;
     }
   </script>
 </body>
