@@ -54,7 +54,7 @@
     let isUpdating = false; // 标志位控制更新频率
     let isCut = false; // 是否裁剪
 
-    // 是否裁剪
+    // 裁剪模式切换
     function handleCut(e) {
       const btn = e.target
       isCut = !isCut;
@@ -107,7 +107,7 @@
       });
     }
 
-    // 更新预览图
+    // 更新裁剪预览图
     function updatePreview() {
       if (!cropper) return;
 
@@ -120,6 +120,7 @@
       previewContainer.style.backgroundImage = `url(${croppedCanvas.toDataURL()})`;
     }
 
+    // 修改图片分辨率
     function resizeImage() {
       const width = parseInt(document.getElementById('widthInput').value);
 
@@ -145,6 +146,10 @@
       document.getElementById('resizedImage').src = canvas.toDataURL();
       document.getElementById('resizedSize').textContent = `${width} x ${height.toFixed(0)}`;
       document.getElementById('resized').style.display = 'block'
+      document.getElementById('resizeButton').textContent = '成功'
+      setTimeout(() => {
+        document.getElementById('resizeButton').textContent = '开始转换'
+      }, 1000);
 
     }
 
