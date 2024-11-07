@@ -75,6 +75,7 @@
       file = event.target.files[0];
       if (!file) return
       showOriginalImage(file)
+     
     }
 
     /** 展示原始预览图 */
@@ -149,7 +150,8 @@
       const originalImage = document.getElementById('originalImage')
       // 按比例的高度
       let height = ((originalImage.height / originalImage.width) * width).toFixed(0);
-
+      const url = document.getElementById('resizedImage').src
+      if(url) URL.revokeObjectURL(url)
       if(isGif) {
         // 处理gif图
         cutGif(width, height)
