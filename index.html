@@ -6,13 +6,16 @@
   <title>框选裁剪并缩小图片</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.css" />
   <link rel="stylesheet" href="./css/index.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.js"></script>
+  <script src="./js/gifjs/gif.js"></script>
+  <script src="./bundle.js"></script>
+
 </head>
 <body>
   <div class="title-cell">
     <label class="btn" for="fileInput">选择图片</label>
-    <button class="btn" onclick="handleCut(event)">开启裁剪模式</button>
-    <button id="resizeButton" class="btn" onclick="resizeImage()">开始转换</button>
-
+    <button class="btn" onclick="switchCut(event)">开启裁剪模式</button>
+    <button id="resizeButton" class="btn" onclick="startWorking()">开始转换</button>
   </div>
   <input type="file" id="fileInput" accept="image/*" onchange="handleFileChange(event)">
 
@@ -46,16 +49,16 @@
     </div>
     <img id="resizedImage" alt="缩小后的图片" class="image" />
   </div>
+  <canvas id="canvas"></canvas>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.js"></script>
   <script>
-    let img = new Image(); 
     let cropper; 
     let isUpdating = false; // 标志位控制更新频率
     let isCut = false; // 是否裁剪
+    let file = null // 选中的文件
 
     // 裁剪模式切换
-    function handleCut(e) {
+    function switchCut(e) {
       const btn = e.target
       isCut = !isCut;
       btn.textContent = isCut ? '关闭裁剪模式' : '开启裁剪模式';
@@ -68,24 +71,43 @@
     }
 
     // 文件选中后
-    function handleFileChange(event) {
-      const file = event.target.files[0];
-      if (file) {
-        document.getElementById('original').style.display = 'block'
-        const reader = new FileReader();
-        
-        reader.onload = function(e) {
-          img.src = e.target.result;
-          document.getElementById('originalImage').src = img.src;
-          
-          img.onload = function() {
-            document.getElementById('originalSize').textContent = `${img.width} x ${img.height}`;
-            if(isCut) initCropper()
-            
-          };
-        };
-        reader.readAsDataURL(file);
+    async function handleFileChange(event) {
+      file = event.target.files[0];
+      if (!file) return
+      showOriginalImage(file)
+    }
+
+    /** 展示原始预览图 */
+    function showOriginalImage(blob) {
+      const img = document.getElementById('originalImage')
+      const box = document.querySelector('#original .originalImage-box')
+      img.src = URL.createObjectURL(blob)
+     
+      img.onload = () => {
+        document.querySelector('#original').style.display = 'block';
+        box.style.width = `${img.naturalWidth}px`
+        box.style.height = `${img.naturalHeight}px`
       }
+    }
+
+    /** 展示处理后的预览图 */
+    function showResizedImage(data) {
+
+      const isBlob = data instanceof Blob
+      const url = isBlob ? URL.createObjectURL(data) : data
+
+      document.getElementById('resized').style.display = 'block';
+      const img = document.getElementById('resizedImage')
+      img.src = url
+      img.onload = () => {
+        console.log('img.naturalWidth', img.naturalWidth)
+        img.style.width = `${img.naturalWidth}px`
+        img.style.height = `${img.naturalHeight}px`
+      }
+      document.getElementById('resizeButton').textContent = '成功'
+      setTimeout(() => {
+        document.getElementById('resizeButton').textContent = '开始转换'
+      }, 1000);
     }
 
     // 初始化裁剪工具
@@ -120,46 +142,87 @@
       previewContainer.style.backgroundImage = `url(${croppedCanvas.toDataURL()})`;
     }
 
-    // 修改图片分辨率
-    function resizeImage() {
+    // 开始处理图片
+    function startWorking() {
+      const isGif = file.type === 'image/gif'
       const width = parseInt(document.getElementById('widthInput').value);
+      const originalImage = document.getElementById('originalImage')
+      // 按比例的高度
+      let height = ((originalImage.height / originalImage.width) * width).toFixed(0);
 
-      let canvas;
-      let height;
+      if(isGif) {
+        // 处理gif图
+        cutGif(width, height)
+      }else{
+        // 处理普通图片
+        cutImage(width, height)
+      }
+    }
 
+    /** 剪切图片 */
+    function cutImage(width, height) {
+      let image = null
       if (!isCut) {
-        // 直接使用原始图片的宽高来计算高度
-        height = (img.height / img.width) * width;
-        canvas = createResizedCanvas(img, width, height);
+        // 处理普通图片
+        image = document.getElementById('originalImage')
       } else {
         if (!cropper) {
           alert("请先选择并裁剪图片！");
           return;
         }
-
         // 使用 Cropper 进行裁剪
-        const croppedCanvas = cropper.getCroppedCanvas();
-        height = (croppedCanvas.height / croppedCanvas.width) * width;
-        canvas = createResizedCanvas(croppedCanvas, width, height);
+        image = cropper.getCroppedCanvas();
+        height = (image.height / image.width) * width;
       }
-
-      document.getElementById('resizedImage').src = canvas.toDataURL();
-      document.getElementById('resizedSize').textContent = `${width} x ${height.toFixed(0)}`;
-      document.getElementById('resized').style.display = 'block'
-      document.getElementById('resizeButton').textContent = '成功'
-      setTimeout(() => {
-        document.getElementById('resizeButton').textContent = '开始转换'
-      }, 1000);
-
+      document.getElementById('resizedSize').textContent = `${width} x ${height}`;
+      showResizedImage(getResizedCanvas(image, width, height).toDataURL())
     }
 
-    // 创建缩放后的画布
-    function createResizedCanvas(sourceCanvas, width, height) {
+    /** 剪切gif图片 */
+    async function cutGif(width, height) {
+      const arrayBuffer = await file.arrayBuffer();
+      const parsedGIF = Gifuct.parseGIF(arrayBuffer);
+      const frames = Gifuct.decompressFrames(parsedGIF, true);
+
+    
+      var gif = new GIF({
+        workers: 2,
+        quality: 10,
+        width,
+        height
+      })
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d')
+      canvas.width = frames[0].dims.width
+      canvas.height = frames[0].dims.height
+      const imageData = ctx.createImageData(frames[0].dims.width, frames[0].dims.height)
+      frames.forEach((frame, i) => {
+        imageData.data.set(frame.patch)
+        ctx.putImageData(imageData,0,0)
+       
+        // const img = document.createElement('img')
+        // img.src = canvas.toDataURL("image/png")
+        // img.width = 200
+        // img.height = 200
+        // document.body.appendChild(img)
+
+        gif.addFrame(getResizedCanvas(canvas, width, height), {delay: frame.delay || 200, copy: true});
+        // gif.addFrame(ctx, {copy: true, delay: frame.delay || 200})
+      });
+      gif.on('finished', function(blob) {
+        document.getElementById('resizedSize').textContent = `${width} x ${height}`;
+        showResizedImage(blob)
+      });
+      gif.render();
+    }
+
+
+    /** 处理图片的canvas */
+    function getResizedCanvas(sourceCanvas, width, height) {
       const canvas = document.createElement('canvas');
       canvas.width = width;
       canvas.height = height;
       const ctx = canvas.getContext('2d');
-
       // 设置圆角半径
       const imgRadius = parseInt(document.getElementById('imgRadius').value); // 根据需要调整圆角半径
 
