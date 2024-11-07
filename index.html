@@ -14,7 +14,7 @@
 <body>
   <div class="title-cell">
     <label class="btn" for="fileInput">选择图片</label>
-    <button class="btn" onclick="switchCut(event)">开启裁剪模式</button>
+    <button class="btn" id="switchBtn" onclick="switchCut()">开启裁剪模式</button>
     <button id="resizeButton" class="btn" onclick="startWorking()">开始转换</button>
   </div>
   <input type="file" id="fileInput" accept="image/*" onchange="handleFileChange(event)">
@@ -59,7 +59,7 @@
 
     // 裁剪模式切换
     function switchCut(e) {
-      const btn = e.target
+      const btn = document.getElementById('switchBtn')
       isCut = !isCut;
       btn.textContent = isCut ? '关闭裁剪模式' : '开启裁剪模式';
       document.getElementById('preview').style.display = isCut ? 'block' : 'none'
@@ -75,7 +75,7 @@
       file = event.target.files[0];
       if (!file) return
       showOriginalImage(file)
-     
+      if(file.type === 'image/gif' && isCut) switchCut()
     }
 
     /** 展示原始预览图 */
